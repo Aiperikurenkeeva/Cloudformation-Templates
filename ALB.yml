@@ -1,0 +1,72 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Application Loadbalancer.
+Parameters:
+  VPC:
+    Type: String
+  SUBNETS:
+    Type: String
+  SecurityGroup:
+    Type: String
+  WebServers:
+    Type: String
+Resources:
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Subnets:
+      - Fn::ImportValue:
+          Fn::Sub: "${SUBNETS}-Subnet01"
+      - Fn::ImportValue:
+          Fn::Sub: "${SUBNETS}-Subnet02"
+      Name: ALB01
+      SecurityGroups:
+      - Fn::ImportValue:
+          Fn::Sub: "${SecurityGroup}-WebServerSecurityGroup"
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn:
+          Ref: ALBTargetGroup
+      LoadBalancerArn:
+        Ref: ApplicationLoadBalancer
+      Port: '80'
+      Protocol: HTTP
+  ALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 5
+      VpcId:
+        Fn::ImportValue:
+          Fn::Sub: "${VPC}-VPCID"
+      TargetGroupAttributes:
+      - Key: stickiness.enabled
+        Value: 'true'
+      - Key: stickiness.type
+        Value: lb_cookie
+      - Key: stickiness.lb_cookie.duration_seconds
+        Value: '30'
+      Targets:
+      - Id:
+          Fn::ImportValue:
+            Fn::Sub: "${WebServers}-WebServer01"
+        Port: 80
+      - Id:
+          Fn::ImportValue:
+            Fn::Sub: "${WebServers}-WebServer02"
+        Port: 80
+Outputs:
+  ApplicationLoadBalancer:
+    Description: ALB output value
+    Value:
+      Ref: ApplicationLoadBalancer
+    Export:
+      Name:
+        Fn::Sub: "${AWS::StackName}-ApplicationLoadBalancer"
